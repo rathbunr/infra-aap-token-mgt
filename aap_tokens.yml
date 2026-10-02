@@ -1,0 +1,187 @@
+---
+# ==============================================================================
+# AAP Non-User Credential Management
+# ------------------------------------------------------------------------------
+# Play 1 : One-time bootstrap of all Red Hat tokens that AAP needs
+# Play 2 : Daily keep-alive (safe to schedule)
+#
+# WHERE TO OBTAIN THE TOKENS / CREDENTIALS
+# ----------------------------------------
+# 1. Offline token (for collection remotes – rh-certified etc.)
+#    URL : https://console.redhat.com/ansible/automation-hub/token
+#    Action: Click "Load Token" → copy the Offline token
+#    Keep-alive: this playbook refreshes it so it never expires
+#
+# 2. Registry Service Account (for registry.redhat.io container pulls)
+#    URL : https://access.redhat.com/terms-based-registry
+#          (or https://access.redhat.com/terms-based-registry/accounts)
+#    Action: "New Service Account" → copy the generated username
+#            (looks like 12345678|myaccount) and the long token
+#    Note : No API exists to rotate this; regenerate in the UI when needed
+#
+# 3. Hybrid Cloud Console Service Account (for Automation Analytics)
+#    URL : https://console.redhat.com/iam/service-accounts
+#          (Settings gear → Service Accounts → Create service account)
+#    Action: Copy Client ID + Client Secret (shown only once)
+#    Then add the service account to a User Access group that has
+#    the "Automation Analytics Viewer" (or equivalent) role
+#
+# References
+# ----------
+# Offline token:
+#   https://console.redhat.com/ansible/automation-hub/token
+#   https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7/html/managing_automation_content/managing-cert-valid-content
+#   https://access.redhat.com/articles/3626371
+#
+# Registry Service Account:
+#   https://access.redhat.com/terms-based-registry
+#   https://access.redhat.com/articles/4259601
+#
+# Analytics Service Account:
+#   https://console.redhat.com/iam/service-accounts
+#   https://access.redhat.com/articles/7112649
+#   https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7/html/optimizing_your_automation_controller/user-data-tracking
+# ==============================================================================
+
+- name: "Play 1 – One-time set of all AAP non-user tokens"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [setup, once]
+
+  vars:
+    aap_hostname: "https://ans-01.corp.ritcsusa.com"
+    aap_username: "admin"
+    aap_password: "{{ vault_aap_admin_password }}"
+    aap_validate_certs: false
+
+    # --- Obtain these once from the URLs listed in the header ---
+    # 1. Offline token  → https://console.redhat.com/ansible/automation-hub/token
+    rh_offline_token: "{{ vault_rh_offline_token }}"
+
+    # 2. Registry Service Account → https://access.redhat.com/terms-based-registry
+    rh_registry_username: "12746268|rh-co-lab"
+    rh_registry_token: "{{ vault_rh_registry_token }}"
+
+    # 3. Analytics Service Account → https://console.redhat.com/iam/service-accounts
+    rh_analytics_client_id: "{{ vault_rh_analytics_client_id }}"
+    rh_analytics_client_secret: "{{ vault_rh_analytics_client_secret }}"
+
+  tasks:
+    - name: Set rh-certified collection remote token
+      ansible.hub.ah_repository:
+        name: rh-certified
+        url: "https://console.redhat.com/api/automation-hub/content/published/"
+        auth_url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+        token: "{{ rh_offline_token }}"
+        tls_validation: true
+        state: present
+        ah_host: "{{ aap_hostname }}"
+        ah_username: "{{ aap_username }}"
+        ah_password: "{{ aap_password }}"
+        ah_path_prefix: "galaxy"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
+
+    - name: Set registry.redhat.io remote registry credentials
+      ansible.hub.ah_ee_registry:
+        name: "Red Hat Registry"
+        url: "https://registry.redhat.io"
+        username: "{{ rh_registry_username }}"
+        password: "{{ rh_registry_token }}"
+        tls_validation: true
+        state: present
+        ah_host: "{{ aap_hostname }}"
+        ah_username: "{{ aap_username }}"
+        ah_password: "{{ aap_password }}"
+        ah_path_prefix: "galaxy"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
+
+    - name: Configure Automation Analytics with Service Account
+      ansible.controller.settings:
+        settings:
+          REDHAT_CLIENT_ID: "{{ rh_analytics_client_id }}"
+          REDHAT_CLIENT_SECRET: "{{ rh_analytics_client_secret }}"
+          INSIGHTS_TRACKING_STATE: true
+        controller_host: "{{ aap_hostname }}"
+        controller_username: "{{ aap_username }}"
+        controller_password: "{{ aap_password }}"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
+
+# ==============================================================================
+- name: "Play 2 – Daily keep-alive of AAP non-user tokens"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [keepalive, daily]
+
+  vars:
+    aap_hostname: "https://ans-01.corp.ritcsusa.com"
+    aap_username: "admin"
+    aap_password: "{{ vault_aap_admin_password }}"
+    aap_validate_certs: false
+
+    rh_offline_token: "{{ vault_rh_offline_token }}"
+    rh_registry_username: "12746268|rh-co-lab"
+    rh_registry_token: "{{ vault_rh_registry_token }}"
+    rh_analytics_client_id: "{{ vault_rh_analytics_client_id }}"
+    rh_analytics_client_secret: "{{ vault_rh_analytics_client_secret }}"
+
+  tasks:
+    - name: Refresh Red Hat offline token (keep-alive)
+      ansible.builtin.uri:
+        url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: refresh_token
+          client_id: cloud-services
+          refresh_token: "{{ rh_offline_token }}"
+        status_code: [200]
+      register: token_refresh
+      changed_when: false
+      no_log: true
+
+    - name: Re-assert rh-certified collection remote token
+      ansible.hub.ah_repository:
+        name: rh-certified
+        url: "https://console.redhat.com/api/automation-hub/content/published/"
+        auth_url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+        token: "{{ rh_offline_token }}"
+        tls_validation: true
+        state: present
+        ah_host: "{{ aap_hostname }}"
+        ah_username: "{{ aap_username }}"
+        ah_password: "{{ aap_password }}"
+        ah_path_prefix: "galaxy"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
+
+    - name: Re-assert registry.redhat.io remote registry credentials
+      ansible.hub.ah_ee_registry:
+        name: "Red Hat Registry"
+        url: "https://registry.redhat.io"
+        username: "{{ rh_registry_username }}"
+        password: "{{ rh_registry_token }}"
+        tls_validation: true
+        state: present
+        ah_host: "{{ aap_hostname }}"
+        ah_username: "{{ aap_username }}"
+        ah_password: "{{ aap_password }}"
+        ah_path_prefix: "galaxy"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
+
+    - name: Re-assert Automation Analytics credentials
+      ansible.controller.settings:
+        settings:
+          REDHAT_CLIENT_ID: "{{ rh_analytics_client_id }}"
+          REDHAT_CLIENT_SECRET: "{{ rh_analytics_client_secret }}"
+          INSIGHTS_TRACKING_STATE: true
+        controller_host: "{{ aap_hostname }}"
+        controller_username: "{{ aap_username }}"
+        controller_password: "{{ aap_password }}"
+        validate_certs: "{{ aap_validate_certs }}"
+      no_log: true
