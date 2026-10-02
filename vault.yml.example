@@ -1,0 +1,19 @@
+# Copy to vault.yml and encrypt with:
+#   ansible-vault encrypt vault.yml
+#
+# Then either:
+#   ansible-playbook aap_tokens.yml -e @vault.yml --ask-vault-pass
+# or place under group_vars/all/vault.yml
+
+vault_aap_admin_password: "change-me"
+
+# From https://console.redhat.com/ansible/automation-hub/token
+vault_rh_offline_token: "eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJhZDUyMjdhMy1iY2ZkLTRjZjAtYTdiNi0zOTk4MzVhMDg1NjYifQ..."
+
+# From https://access.redhat.com/terms-based-registry
+# username is set directly in the playbook vars (rh_registry_username)
+vault_rh_registry_token: "eyJhbGciOiJSUzUxMiJ9..."
+
+# From https://console.redhat.com/iam/service-accounts
+vault_rh_analytics_client_id: "service-account-xxxxxxxx"
+vault_rh_analytics_client_secret: "xxxxxxxxxxxxxxxxxxxxxxxx"
