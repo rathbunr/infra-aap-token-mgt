@@ -40,7 +40,7 @@ As long as this playbook runs at least once every 30 days, the token never expir
 **URL:** [access.redhat.com/terms-based-registry](https://access.redhat.com/terms-based-registry)
 
 1. Click **New Service Account**  
-2. Copy the username (`12345678\|accountname`) and the long token  
+2. Copy the username (`12345678|accountname`) and the long token  
 
 There is no API to rotate this — regenerate in the UI when needed.
 
@@ -59,19 +59,22 @@ There is no API to rotate this — regenerate in the UI when needed.
 ```text
 .
 ├── playbooks/
-│   └── aap_tokens.yml          # entry point
+│   ├── aap_tokens.yml                 # entry point (setup / keepalive)
+│   └── configure_credential_type.yml  # one-time: create custom credential type
 ├── roles/
 │   └── aap_token_mgt/
 │       ├── defaults/main.yml
 │       ├── tasks/
 │       │   ├── main.yml
-│       │   ├── setup.yml       # first-time write
-│       │   └── keepalive.yml   # daily refresh + re-assert
+│       │   ├── setup.yml
+│       │   └── keepalive.yml
 │       └── meta/main.yml
+├── configs/
+│   └── credential_types.yml           # CaC definition for the custom type
 ├── group_vars/
 │   └── all/
-│       └── vault.yml.example   # copy → vault.yml, then encrypt
-├── requirements.yml            # ansible.hub, ansible.controller, infra.aap_configuration
+│       └── vault.yml.example          # CLI-only secrets template
+├── requirements.yml
 └── README.md
 ```
 
@@ -79,23 +82,49 @@ There is no API to rotate this — regenerate in the UI when needed.
 
 ## Quick start
 
-```bash
-# Install dependencies
-ansible-galaxy collection install -r requirements.yml
+### 1. Install collections
 
-# Secrets
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+### 2a. Run from AAP (recommended)
+
+Create the custom credential type once:
+
+```bash
+ansible-playbook playbooks/configure_credential_type.yml \
+  -e aap_hostname=https://aap.example.com \
+  -e aap_username=admin \
+  -e aap_password=secret \
+  -e aap_validate_certs=false
+```
+
+Then in AAP:
+
+1. **Credentials** → add a credential of type **AAP Token Management** and fill in the tokens  
+2. Create a Project pointing at this repo  
+3. Create a Job Template:
+   - Playbook: `playbooks/aap_tokens.yml`
+   - Credential: the one you just created
+   - Job tags: `setup` (first run) or `keepalive` (daily)
+4. Schedule the Job Template with tag `keepalive`
+
+Secrets stay in AAP’s encrypted credential store — no vault file on disk.
+
+### 2b. Run from CLI
+
+```bash
 cp group_vars/all/vault.yml.example group_vars/all/vault.yml
 # edit vault.yml with real values
 ansible-vault encrypt group_vars/all/vault.yml
 
-# First run – write everything into AAP
+# First run
 ansible-playbook playbooks/aap_tokens.yml --tags setup --ask-vault-pass
 
-# Thereafter – keep tokens alive (cron / AAP schedule)
+# Daily keep-alive
 ansible-playbook playbooks/aap_tokens.yml --tags keepalive --ask-vault-pass
 ```
-
-### Suggested schedule
 
 ```cron
 # Daily at 03:15
@@ -103,6 +132,26 @@ ansible-playbook playbooks/aap_tokens.yml --tags keepalive --ask-vault-pass
               --tags keepalive \
               --vault-password-file /etc/ansible/vault_pass
 ```
+
+---
+
+## Custom credential type
+
+Defined in `configs/credential_types.yml` and applied by `playbooks/configure_credential_type.yml`.
+
+| Field | Secret | Purpose |
+|-------|--------|--------|
+| `aap_hostname` | no | Platform / Controller URL |
+| `aap_username` | no | Admin user |
+| `aap_password` | yes | Admin password |
+| `aap_validate_certs` | no | TLS verification |
+| `rh_offline_token` | yes | Collection remote offline token |
+| `rh_registry_username` | no | Registry SA username (`id|name`) |
+| `rh_registry_token` | yes | Registry SA token |
+| `rh_analytics_client_id` | no | Analytics service account ID |
+| `rh_analytics_client_secret` | yes | Analytics service account secret |
+
+All fields are injected as `extra_vars` into the job.
 
 ---
 
