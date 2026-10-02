@@ -1,0 +1,59 @@
+---
+# Offline token keep-alive — no official role exists for this.
+# Ref: https://access.redhat.com/articles/3626371
+#      https://console.redhat.com/ansible/automation-hub/token
+
+- name: Refresh Red Hat offline token (keep-alive)
+  ansible.builtin.uri:
+    url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: refresh_token
+      client_id: cloud-services
+      refresh_token: "{{ rh_offline_token }}"
+    status_code: [200]
+  register: token_refresh
+  changed_when: false
+  no_log: true
+  tags: [keepalive, daily]
+
+- name: Re-assert rh-certified collection remote token
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.hub_collection_remote
+  vars:
+    hub_collection_remotes:
+      - name: "{{ rh_collection_remote_name }}"
+        url: "{{ rh_collection_remote_url }}"
+        auth_url: "{{ rh_collection_remote_auth_url }}"
+        token: "{{ rh_offline_token }}"
+        tls_validation: true
+        state: present
+  no_log: true
+  tags: [keepalive, daily, collections]
+
+- name: Re-assert registry.redhat.io EE registry credentials
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.hub_ee_registry
+  vars:
+    hub_ee_registries:
+      - name: "{{ rh_registry_name }}"
+        url: "{{ rh_registry_url }}"
+        username: "{{ rh_registry_username }}"
+        password: "{{ rh_registry_token }}"
+        tls_validation: "{{ rh_registry_tls_validation }}"
+        state: present
+  no_log: true
+  tags: [keepalive, daily, registry]
+
+- name: Re-assert Automation Analytics credentials
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.controller_settings
+  vars:
+    controller_settings:
+      settings:
+        REDHAT_CLIENT_ID: "{{ rh_analytics_client_id }}"
+        REDHAT_CLIENT_SECRET: "{{ rh_analytics_client_secret }}"
+        INSIGHTS_TRACKING_STATE: "{{ rh_analytics_gather }}"
+  no_log: true
+  tags: [keepalive, daily, analytics]

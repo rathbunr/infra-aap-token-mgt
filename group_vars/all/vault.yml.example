@@ -1,0 +1,19 @@
+---
+# Encrypt with: ansible-vault encrypt group_vars/all/vault.yml
+# Source of truth for secrets — never commit the real vault.yml
+
+aap_hostname: "https://ans-01.corp.ritcsusa.com"
+aap_username: "admin"
+aap_password: "change-me"
+aap_validate_certs: false
+
+# https://console.redhat.com/ansible/automation-hub/token
+rh_offline_token: "eyJ..."
+
+# https://access.redhat.com/terms-based-registry
+rh_registry_username: "12345678|myaccount"
+rh_registry_token: "eyJ..."
+
+# https://console.redhat.com/iam/service-accounts
+rh_analytics_client_id: "service-account-xxxxxxxx"
+rh_analytics_client_secret: "xxxxxxxx"

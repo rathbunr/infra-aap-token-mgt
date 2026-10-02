@@ -1,0 +1,8 @@
+---
+- name: Include setup tasks
+  ansible.builtin.include_tasks: setup.yml
+  tags: [setup, once]
+
+- name: Include keep-alive tasks
+  ansible.builtin.include_tasks: keepalive.yml
+  tags: [keepalive, daily]

@@ -1,0 +1,30 @@
+---
+# ==============================================================================
+# AAP Non-User Credential Management
+# ------------------------------------------------------------------------------
+# Uses official roles from infra.aap_configuration where available:
+#   - hub_collection_remote
+#   - hub_ee_registry
+#   - controller_settings
+# Offline-token keep-alive is custom (no official role).
+#
+# WHERE TO OBTAIN THE TOKENS
+# --------------------------
+# 1. Offline token:
+#    https://console.redhat.com/ansible/automation-hub/token
+# 2. Registry Service Account:
+#    https://access.redhat.com/terms-based-registry
+# 3. Analytics Service Account:
+#    https://console.redhat.com/iam/service-accounts
+# ==============================================================================
+
+- name: Manage AAP non-user Red Hat tokens
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/all/vault.yml"
+
+  roles:
+    - role: aap_token_mgt

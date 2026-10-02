@@ -1,0 +1,43 @@
+---
+# Uses official infra.aap_configuration roles for Hub remotes/registries
+# and controller settings. Offline-token keep-alive is custom (no official role).
+
+- name: Configure rh-certified collection remote (official role)
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.hub_collection_remote
+  vars:
+    hub_collection_remotes:
+      - name: "{{ rh_collection_remote_name }}"
+        url: "{{ rh_collection_remote_url }}"
+        auth_url: "{{ rh_collection_remote_auth_url }}"
+        token: "{{ rh_offline_token }}"
+        tls_validation: true
+        state: present
+  no_log: true
+  tags: [setup, once, collections]
+
+- name: Configure registry.redhat.io EE registry (official role)
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.hub_ee_registry
+  vars:
+    hub_ee_registries:
+      - name: "{{ rh_registry_name }}"
+        url: "{{ rh_registry_url }}"
+        username: "{{ rh_registry_username }}"
+        password: "{{ rh_registry_token }}"
+        tls_validation: "{{ rh_registry_tls_validation }}"
+        state: present
+  no_log: true
+  tags: [setup, once, registry]
+
+- name: Configure Automation Analytics credentials (official role)
+  ansible.builtin.include_role:
+    name: infra.aap_configuration.controller_settings
+  vars:
+    controller_settings:
+      settings:
+        REDHAT_CLIENT_ID: "{{ rh_analytics_client_id }}"
+        REDHAT_CLIENT_SECRET: "{{ rh_analytics_client_secret }}"
+        INSIGHTS_TRACKING_STATE: "{{ rh_analytics_gather }}"
+  no_log: true
+  tags: [setup, once, analytics]

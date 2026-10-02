@@ -1,0 +1,26 @@
+---
+# Connection
+aap_hostname: ""
+aap_username: ""
+aap_password: ""
+aap_validate_certs: true
+
+# Offline token (collections) — from https://console.redhat.com/ansible/automation-hub/token
+rh_offline_token: ""
+
+# Registry Service Account — from https://access.redhat.com/terms-based-registry
+rh_registry_name: "redhat_registry"
+rh_registry_url: "https://registry.redhat.io"
+rh_registry_username: ""
+rh_registry_token: ""
+rh_registry_tls_validation: true
+
+# Analytics Service Account — from https://console.redhat.com/iam/service-accounts
+rh_analytics_client_id: ""
+rh_analytics_client_secret: ""
+rh_analytics_gather: true
+
+# Collection remote
+rh_collection_remote_name: "rh-certified"
+rh_collection_remote_url: "https://console.redhat.com/api/automation-hub/content/published/"
+rh_collection_remote_auth_url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"

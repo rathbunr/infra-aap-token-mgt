@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: aap_token_mgt
+  author: rathbunr
+  description: Manage AAP non-user Red Hat tokens (offline token keep-alive, registry service account, analytics service account)
+  license: GPL-3.0-or-later
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["9"]
+  galaxy_tags:
+    - aap
+    - automation
+    - tokens
+    - hub
+dependencies: []
