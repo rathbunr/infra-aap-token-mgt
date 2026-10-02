@@ -8,14 +8,8 @@
 #   - controller_settings
 # Offline-token keep-alive is custom (no official role).
 #
-# WHERE TO OBTAIN THE TOKENS
-# --------------------------
-# 1. Offline token:
-#    https://console.redhat.com/ansible/automation-hub/token
-# 2. Registry Service Account:
-#    https://access.redhat.com/terms-based-registry
-# 3. Analytics Service Account:
-#    https://console.redhat.com/iam/service-accounts
+# When run from AAP: attach a credential of type "AAP Token Management".
+# When run from CLI: use group_vars/all/vault.yml (ansible-vault).
 # ==============================================================================
 
 - name: Manage AAP non-user Red Hat tokens
@@ -23,8 +17,13 @@
   connection: local
   gather_facts: false
 
-  vars_files:
-    - "{{ playbook_dir }}/../group_vars/all/vault.yml"
+  pre_tasks:
+    - name: Load vault file when present (CLI runs)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/all/vault.yml"
+      when: not (aap_hostname is defined and aap_hostname | length > 0)
+      ignore_errors: true
+      no_log: true
 
   roles:
     - role: aap_token_mgt
